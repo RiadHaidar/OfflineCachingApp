@@ -44,4 +44,30 @@ class TextStyles {
     fontWeight: FontWeightHelper.regular,
     color: AppColors.textSecondary,
   );
+
+
+
+    static TextStyle font24WhiteBold = TextStyle(
+    fontSize: 24,
+    fontWeight: FontWeightHelper.bold,
+    color: Colors.white,
+  );
+
+      static TextStyle font16WhiteMedium = TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeightHelper.medium,
+        color: Colors.white,
+      );
+
+  static TextStyle font14WhiteRegular = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeightHelper.regular,
+    color: Colors.white,
+  );
+
+  static TextStyle font12WhiteRegular = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeightHelper.regular,
+    color: Colors.white,
+  );
 }
