@@ -8,8 +8,40 @@ import '../logic/movies_cubit.dart';
 import '../logic/movies_states.dart';
 import '../widgets/movie_list_item.dart';
 
-class MoviesListScreen extends StatelessWidget {
+class MoviesListScreen extends StatefulWidget {
   const MoviesListScreen({super.key});
+
+  @override
+  State<MoviesListScreen> createState() => _MoviesListScreenState();
+}
+
+class _MoviesListScreenState extends State<MoviesListScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_isBottom) {
+      context.read<MoviesCubit>().loadMore();
+    }
+  }
+
+  bool get _isBottom {
+    if (!_scrollController.hasClients) return false;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    return currentScroll >= maxScroll * 0.9;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,35 +83,9 @@ class MoviesListScreen extends StatelessWidget {
       ),
       body: BlocBuilder<MoviesCubit, MoviesStates>(
         builder: (context, state) {
-          return Column(
-            children: [
-              Expanded(
-                child: _buildMoviesList(context, state, theme),
-              ),
-              Padding(
-                padding: theme.containerPadding,
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      context.read<MoviesCubit>().getMoviesList();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.secondary,
-                      foregroundColor: theme.textSecondary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: theme.cardBorderRadius,
-                      ),
-                    ),
-                    child: Text(
-                      'Load More Movies',
-                      style: theme.buttonStyle,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          return RefreshIndicator(
+            onRefresh: () => context.read<MoviesCubit>().refresh(),
+            child: _buildMoviesList(context, state, theme),
           );
         },
       ),
@@ -93,46 +99,54 @@ class MoviesListScreen extends StatelessWidget {
             color: theme.primary,
           ),
         ),
-      MoviesListSuccess() => ListView.builder(
-          itemCount: state.moviesListResponse.results.length,
-          itemBuilder: (context, index) {
-            final movie = state.moviesListResponse.results[index];
-            return MovieListItem(
-              title: movie.title,
-              rating: movie.voteAverage,
-              genre: movie.genreIds.isNotEmpty ? 'Genre: ${movie.genreIds.first}' : 'Unknown',
-              posterPath: movie.posterPath,
-              onTap: () {
-                context.push(Routes.movieDetails, extra: movie.id);
-              },
-            );
-          },
+      MoviesListSuccess() => _buildMoviesListView(
+          context: context,
+          movies: state.movies,
+          hasMore: state.hasMore,
+          isLoadingMore: false,
+          theme: theme,
         ),
-      MoviesListFailure() => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: theme.primary,
-                size: 60,
-              ),
-              SizedBox(height: theme.spacing),
-              Text(
-                'Error: ${state.message}',
-                style: theme.bodyStyle,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: theme.spacing),
-              ElevatedButton(
-                onPressed: () {
-                  context.read<MoviesCubit>().getMoviesList();
-                },
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+      MoviesListLoadingMore() => _buildMoviesListView(
+          context: context,
+          movies: state.movies,
+          hasMore: state.hasMore,
+          isLoadingMore: true,
+          theme: theme,
         ),
+      MoviesListFailure() => state.movies.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: theme.primary,
+                    size: 60,
+                  ),
+                  SizedBox(height: theme.spacing),
+                  Text(
+                    'Error: ${state.message}',
+                    style: theme.bodyStyle,
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: theme.spacing),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<MoviesCubit>().getMoviesList();
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          : _buildMoviesListView(
+              context: context,
+              movies: state.movies,
+              hasMore: false,
+              isLoadingMore: false,
+              theme: theme,
+              errorMessage: state.message,
+            ),
       _ => Center(
           child: Text(
             'No movies available',
@@ -140,6 +154,64 @@ class MoviesListScreen extends StatelessWidget {
           ),
         ),
     };
+  }
+
+  Widget _buildMoviesListView({
+    required BuildContext context,
+    required List movies,
+    required bool hasMore,
+    required bool isLoadingMore,
+    required MyTheme theme,
+    String? errorMessage,
+  }) {
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: movies.length + (isLoadingMore || errorMessage != null ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= movies.length) {
+          if (errorMessage != null) {
+            return Padding(
+              padding: theme.containerPadding,
+              child: Column(
+                children: [
+                  Text(
+                    'Error: $errorMessage',
+                    style: theme.bodyStyle.copyWith(color: theme.primary),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: theme.spacing),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.read<MoviesCubit>().loadMore();
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: theme.primary,
+              ),
+            ),
+          );
+        }
+
+        final movie = movies[index];
+        return MovieListItem(
+          title: movie.title,
+          rating: movie.voteAverage,
+          genre: movie.genreIds.isNotEmpty ? 'Genre: ${movie.genreIds.first}' : 'Unknown',
+          posterPath: movie.posterPath,
+          onTap: () {
+            context.push(Routes.movieDetails, extra: movie.id);
+          },
+        );
+      },
+    );
   }
 }
 

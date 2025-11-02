@@ -1,3 +1,4 @@
+import '../../data/models/response/movie.dart';
 import '../../data/models/response/movie_details_response.dart';
 import '../../data/models/response/movies_list_response.dart';
 
@@ -9,13 +10,21 @@ final class MoviesInitial extends MoviesStates {}
 final class MoviesListLoading extends MoviesStates {}
 
 final class MoviesListSuccess extends MoviesStates {
-  final MoviesListResponse moviesListResponse;
-  MoviesListSuccess(this.moviesListResponse);
+  final List<Movie> movies;
+  final bool hasMore;
+  MoviesListSuccess({required this.movies, required this.hasMore});
+}
+
+final class MoviesListLoadingMore extends MoviesStates {
+  final List<Movie> movies;
+  final bool hasMore;
+  MoviesListLoadingMore({required this.movies, required this.hasMore});
 }
 
 final class MoviesListFailure extends MoviesStates {
   final String message;
-  MoviesListFailure(this.message);
+  final List<Movie> movies;
+  MoviesListFailure({required this.message, this.movies = const []});
 }
 
 // GET MOVIE DETAILS
